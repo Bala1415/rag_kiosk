@@ -52,6 +52,8 @@ SARVAM_TTS_SPEAKER=shubh_enhi_ads
 SARVAM_TTS_MODEL=bulbul:v4-flash
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=llama3.1-performance:latest
+RETRIEVAL_TOP_K=8
+CONTEXT_CHARS_PER_RESULT=1200
 COLLEGE_URL=https://www.srmvalliammai.ac.in/
 DEPARTMENT_URL=https://www.srmvalliammai.ac.in/department/department-of-artificial-intelligence-and-data-science
 # Maximum same-domain URLs visited per website ingestion

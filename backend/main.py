@@ -27,6 +27,8 @@ SARVAM_API_ROOT = os.getenv("SARVAM_API_ROOT", "https://api.sarvam.ai")
 SARVAM_TTS_LANGUAGE = os.getenv("SARVAM_TTS_LANGUAGE", "ta-IN")
 SARVAM_TTS_SPEAKER = os.getenv("SARVAM_TTS_SPEAKER", "shubh_enhi_ads")
 SARVAM_TTS_MODEL = os.getenv("SARVAM_TTS_MODEL", "bulbul:v4-flash")
+RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "8"))
+CONTEXT_CHARS_PER_RESULT = int(os.getenv("CONTEXT_CHARS_PER_RESULT", "1200"))
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -333,7 +335,7 @@ async def chat(request: ChatRequest):
         logger.info(f"💬 Processing query: {request.message[:80]}...")
         
         # 1. Query vector store for similar documents
-        query_results = vector_store.query(request.message, top_k=5)
+        query_results = vector_store.query(request.message, top_k=RETRIEVAL_TOP_K)
         
         if not query_results:
             # No relevant documents found
@@ -363,15 +365,23 @@ async def chat(request: ChatRequest):
         sources = []
         
         for i, result in enumerate(query_results):
-            content = result.get("content", "")[:300]  # Limit per chunk
+            content = result.get("content", "")[:CONTEXT_CHARS_PER_RESULT]
             metadata = result.get("metadata", {})
             distance = result.get("distance", 1.0)
+            source_name = (
+                metadata.get("filename")
+                or metadata.get("file_path")
+                or metadata.get("title")
+                or metadata.get("url")
+                or "unknown"
+            )
             
-            context_parts.append(f"[Source {i+1} - {metadata.get('filename', 'unknown')}]\n{content}")
+            context_parts.append(f"[Source {i+1} - {source_name}]\n{content}")
             
             sources.append({
                 "source": metadata.get("source", "unknown"),
-                "file": metadata.get("filename", "unknown"),
+                "file": source_name,
+                "url": metadata.get("url"),
                 "type": metadata.get("file_type", "unknown"),
                 "distance": round(distance, 4)
             })
@@ -386,6 +396,9 @@ async def chat(request: ChatRequest):
         Guidelines:
         - Provide accurate, concise answers based strictly on the context
         - If the answer is not in the context, say "I'm sorry, but I don't have that information in my college records."
+        - For names, designations, titles, dates, and contact details, copy the exact value from one supporting source; never guess, merge, or invent values.
+        - If sources contain conflicting values, explain that the records conflict and identify the conflicting sources instead of choosing one silently.
+        - Do not use general knowledge or information from outside the provided context.
         - Include source references when possible (e.g., "According to the events list...")
         - Be professional and friendly
         - If asked about something outside department scope, politely redirect to department topics
