@@ -1,0 +1,32 @@
+# Core Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+
+# Vector Database & Embeddings
+chromadb==0.5.17
+sentence-transformers==3.1.1
+# CUDA-enabled PyTorch for NVIDIA GPU acceleration. Remove the extra index and
+# use a CPU build only when deploying on a machine without an NVIDIA GPU.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0+cu128
+
+# Document Parsing
+pypdf==4.2.0
+python-docx==1.1.0
+openpyxl==3.1.5
+python-pptx==1.0.2
+pytesseract==0.3.10
+Pillow==10.4.0
+
+# Web Scraping
+requests==2.32.3
+python-multipart==0.0.12
+beautifulsoup4==4.12.3
+lxml==5.2.2
+
+# Utilities
+python-dotenv==1.0.1
+tqdm==4.66.5
+
+# For OCR on Ubuntu (optional - install system package tesseract-ocr)
+# On Windows: download tesseract installer from https://github.com/UB-Mannheim/tesseract/wiki

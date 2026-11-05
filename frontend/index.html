@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Kiosk RAG Chatbot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f40b0b;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Robot Avatar */
+        #avatar {
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 25%, #9fdbff 0 8%, #4f80dc 35%, #26356f 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 24px auto;
+            box-shadow: 0 12px 35px rgba(47, 105, 220, 0.45), inset 0 0 25px rgba(255,255,255,0.22);
+            position: relative;
+        }
+        
+        #avatar svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .avatar-eye {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 0 8px rgba(255,255,255,0.6);
+            transition: transform 0.3s;
+        }
+        
+        .avatar-eye.left { left: 30%; }
+        .avatar-eye.right { right: 30%; }
+        
+        .avatar-mouth {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 24px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #fff;
+        }
+        
+        /* Chat Area */
+        .chat-container {
+            background: #16213e;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            min-height: 500px;
+        }
+        
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .bot-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 25%, #9fdbff, #4f80dc 45%, #26356f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(255,255,255,0.25);
+        }
+
+        .bot-avatar svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .bot-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .provider-switch {
+            display: flex;
+            gap: 10px;
+            margin: 0 0 16px;
+        }
+
+        .provider-switch button {
+            flex: 1;
+            padding: 11px 14px;
+            border: 1px solid #3d5689;
+            background: #101b38;
+            color: #b8c8ed;
+        }
+
+        .provider-switch button.active {
+            background: linear-gradient(135deg, #6c63ff, #a78bfa);
+            border-color: transparent;
+            color: #fff;
+        }
+        
+        .chat-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+        
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .message.user {
+            align-self: flex-end;
+            background: #0f3460;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.bot {
+            align-self: flex-start;
+            background: #1a1a2e;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message .bubble {
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+        
+        .message.user .bubble {
+            background: #e94560;
+            color: white;
+        }
+        
+        .message.bot .bubble {
+            background: #16213e;
+            color: #e0e0e0;
+        }
+        
+        .message .timestamp {
+            font-size: 10px;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Input Area */
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            align-items: stretch;
+        }
+        
+        #messageInput {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-size: 14px;
+            resize: none;
+            min-height: 48px;
+        }
+        
+        #messageInput:focus {
+            outline: none;
+            border-color: #a78bfa;
+        }
+
+        .voice-panel {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-top: 18px;
+            padding: 14px 16px;
+            border: 1px solid #2d477c;
+            border-radius: 16px;
+            background: #101b38;
+        }
+
+        .voice-transcript {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 12px 16px;
+            border: 1px solid #2d477c;
+            border-radius: 12px;
+            background: #0b1530;
+            color: #c9d8f5;
+        }
+
+        .voice-transcript strong {
+            color: #8deaff;
+        }
+
+        #micBtn {
+            width: 64px;
+            height: 64px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 26px;
+            background: linear-gradient(135deg, #24c96b, #0d8f52);
+        }
+
+        #micBtn.recording {
+            background: linear-gradient(135deg, #ff5b73, #c5224c);
+            animation: pulse 1.2s infinite;
+        }
+
+        #waveform {
+            width: 100%;
+            height: 64px;
+            flex: 1;
+            border-radius: 10px;
+            background: #0b1530;
+        }
+
+        #voiceStatus {
+            min-width: 115px;
+            color: #a9bde8;
+            font-size: 12px;
+        }
+
+        @keyframes pulse {
+            50% { box-shadow: 0 0 0 10px rgba(255, 91, 115, .12); }
+        }
+        
+        button {
+            padding: 12px 24px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, #6c63ff, #a78bfa);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(108, 99, 255, 0.5);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+        }
+        
+        .error {
+            color: #ff6b6b;
+            text-align: center;
+            padding: 16px;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- Robot Avatar -->
+    <div id="avatar">
+        <svg viewBox="0 0 220 220" aria-label="3D robot assistant" role="img">
+            <defs>
+                <linearGradient id="robotShell" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#f0fbff"/>
+                    <stop offset=".35" stop-color="#8bd4f5"/>
+                    <stop offset=".75" stop-color="#3976c9"/>
+                    <stop offset="1" stop-color="#183879"/>
+                </linearGradient>
+                <linearGradient id="robotFace" x1="0" y1="0" x2="0" y2="1">
+                    <stop stop-color="#203d83"/>
+                    <stop offset="1" stop-color="#071536"/>
+                </linearGradient>
+                <linearGradient id="robotBody" x1="0" y1="0" x2="1" y2="1">
+                    <stop stop-color="#b9ecff"/>
+                    <stop offset=".5" stop-color="#4f9bdc"/>
+                    <stop offset="1" stop-color="#1b438e"/>
+                </linearGradient>
+                <filter id="robotGlow">
+                    <feGaussianBlur stdDeviation="3" result="blur"/>
+                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+            </defs>
+            <ellipse cx="110" cy="193" rx="64" ry="14" fill="#14245b" opacity=".55"/>
+            <path d="M66 159 Q110 139 154 159 L174 206 H46Z" fill="url(#robotBody)" stroke="#bceeff" stroke-width="2"/>
+            <path d="M82 164 Q110 153 138 164 L132 202 H88Z" fill="#1c4d9d" opacity=".7"/>
+            <path d="M101 163 H119 V192 H101Z" rx="8" fill="#9be6ff" opacity=".85"/>
+            <circle cx="110" cy="192" r="5" fill="#d9f9ff" filter="url(#robotGlow)"/>
+            <rect x="37" y="72" width="18" height="57" rx="9" fill="url(#robotShell)" stroke="#b8efff" stroke-width="2"/>
+            <rect x="165" y="72" width="18" height="57" rx="9" fill="url(#robotShell)" stroke="#b8efff" stroke-width="2"/>
+            <circle cx="46" cy="101" r="5" fill="#5cf1ff" filter="url(#robotGlow)"/>
+            <circle cx="174" cy="101" r="5" fill="#5cf1ff" filter="url(#robotGlow)"/>
+            <path d="M61 49 Q110 15 159 49 L166 109 Q164 151 110 160 Q56 151 54 109Z" fill="url(#robotShell)" stroke="#d3f7ff" stroke-width="3"/>
+            <path d="M70 69 Q110 45 150 69 L147 119 Q110 143 73 119Z" fill="url(#robotFace)" stroke="#92e5ff" stroke-width="2"/>
+            <path d="M75 61 Q105 39 139 55" fill="none" stroke="#fff" stroke-width="5" opacity=".55" stroke-linecap="round"/>
+            <ellipse cx="91" cy="88" rx="11" ry="14" fill="#dffbff"/>
+            <ellipse cx="129" cy="88" rx="11" ry="14" fill="#dffbff"/>
+            <ellipse cx="91" cy="91" rx="5" ry="8" fill="#3fdcff" filter="url(#robotGlow)"/>
+            <ellipse cx="129" cy="91" rx="5" ry="8" fill="#3fdcff" filter="url(#robotGlow)"/>
+            <path d="M92 119 Q110 130 128 119" fill="none" stroke="#70eaff" stroke-width="4" stroke-linecap="round"/>
+            <path d="M110 48 V29" stroke="#c8f7ff" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="110" cy="22" r="9" fill="#63edff" stroke="#e0fcff" stroke-width="3" filter="url(#robotGlow)"/>
+        </svg>
+    </div>
+    
+    <!-- Chat Container -->
+    <div class="container">
+        <div class="chat-header">
+            <div class="bot-avatar">
+                <svg viewBox="0 0 220 220" aria-hidden="true">
+                    <circle cx="110" cy="110" r="105" fill="url(#headerRobotBg)"/>
+                    <defs>
+                        <radialGradient id="headerRobotBg"><stop stop-color="#9fdbff"/><stop offset=".5" stop-color="#4f80dc"/><stop offset="1" stop-color="#26356f"/></radialGradient>
+                    </defs>
+                    <rect x="64" y="90" width="12" height="35" rx="6" fill="#9bdfff"/>
+                    <rect x="144" y="90" width="12" height="35" rx="6" fill="#9bdfff"/>
+                    <path d="M78 70 Q110 48 142 70 L146 119 Q110 143 74 119Z" fill="#15316e" stroke="#c8f7ff" stroke-width="3"/>
+                    <ellipse cx="94" cy="91" rx="8" ry="10" fill="#dffbff"/>
+                    <ellipse cx="126" cy="91" rx="8" ry="10" fill="#dffbff"/>
+                    <circle cx="94" cy="93" r="4" fill="#3fdcff"/>
+                    <circle cx="126" cy="93" r="4" fill="#3fdcff"/>
+                    <path d="M96 115 Q110 124 124 115" fill="none" stroke="#70eaff" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M110 69 V56" stroke="#d3f7ff" stroke-width="3"/>
+                    <circle cx="110" cy="52" r="5" fill="#63edff"/>
+                </svg>
+            </div>
+            <h2>Department Kiosk</h2>
+        </div>
+        
+        <div class="chat-container">
+            <div class="provider-switch" aria-label="Choose AI provider">
+                <button id="ollamaBtn" class="active" type="button">Local LLM</button>
+                <button id="sarvamBtn" type="button">Sarvam AI</button>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <!-- Messages will be injected here -->
+            </div>
+            
+            <div class="input-area">
+                <textarea id="messageInput" placeholder="Ask me about department events, placements, news, or other college information..." rows="1"></textarea>
+                <button id="sendBtn">Send</button>
+            </div>
+            <div class="voice-panel">
+                <button id="micBtn" type="button" aria-label="Start recording">🎙️</button>
+                <canvas id="waveform" aria-label="Microphone waveform"></canvas>
+                <span id="voiceStatus">Tap the mic to speak</span>
+            </div>
+            <div class="voice-transcript" aria-live="polite">
+                <div><strong>Transcript:</strong> <span id="voiceTranscript">Waiting for your voice...</span></div>
+                <div><strong>Reply:</strong> <span id="voiceReply">The answer will appear here.</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize components
+        const chatMessages = document.getElementById("chatMessages");
+        const messageInput = document.getElementById("messageInput");
+        const sendBtn = document.getElementById("sendBtn");
+        const ollamaBtn = document.getElementById("ollamaBtn");
+        const sarvamBtn = document.getElementById("sarvamBtn");
+        const micBtn = document.getElementById("micBtn");
+        const waveform = document.getElementById("waveform");
+        const voiceStatus = document.getElementById("voiceStatus");
+        const voiceTranscript = document.getElementById("voiceTranscript");
+        const voiceReply = document.getElementById("voiceReply");
+        const waveContext = waveform.getContext("2d");
+        
+        // State
+        let currentUserMessage = "";
+        let isLoading = false;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let audioContext = null;
+        let analyser = null;
+        let animationFrame = null;
+        let selectedProvider = "ollama";
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let speechRecognition = null;
+
+        function setProvider(provider) {
+            selectedProvider = provider;
+            ollamaBtn.classList.toggle("active", provider === "ollama");
+            sarvamBtn.classList.toggle("active", provider === "sarvam");
+            voiceStatus.textContent = provider === "ollama"
+                ? "Local LLM selected"
+                : "Sarvam AI selected";
+        }
+
+        ollamaBtn.addEventListener("click", () => setProvider("ollama"));
+        sarvamBtn.addEventListener("click", () => setProvider("sarvam"));
+
+        function drawWaveform() {
+            if (!analyser) return;
+            const values = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteTimeDomainData(values);
+            waveContext.clearRect(0, 0, waveform.width, waveform.height);
+            waveContext.strokeStyle = "#59e7ff";
+            waveContext.lineWidth = 3;
+            waveContext.beginPath();
+            values.forEach((value, index) => {
+                const x = index / values.length * waveform.width;
+                const y = value / 255 * waveform.height;
+                index === 0 ? waveContext.moveTo(x, y) : waveContext.lineTo(x, y);
+            });
+            waveContext.stroke();
+            animationFrame = requestAnimationFrame(drawWaveform);
+        }
+
+        function stopWaveform() {
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            animationFrame = null;
+            analyser = null;
+            waveContext.clearRect(0, 0, waveform.width, waveform.height);
+        }
+
+        function playAudio(base64, contentType) {
+            const audio = new Audio(`data:${contentType};base64,${base64}`);
+            audio.play().catch(() => {
+                voiceStatus.textContent = "Click to play the reply";
+            });
+        }
+
+        function speakWithBrowser(text) {
+            if (!("speechSynthesis" in window)) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "en-IN";
+            window.speechSynthesis.speak(utterance);
+        }
+
+        async function speakReply(text) {
+            const response = await fetch("/speak", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text })
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            playAudio(data.audio_base64, data.content_type);
+        }
+        
+        // Append message to chat
+        function appendMessage(text, role) {
+            const msgDiv = document.createElement("div");
+            msgDiv.className = `message ${role}`;
+            msgDiv.textContent = `${role === "user" ? "You" : "Bot"}: ${text}`;
+            chatMessages.appendChild(msgDiv);
+            
+            // Auto-scroll to bottom
+            requestAnimationFrame(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+        }
+        
+        async function finishRecording() {
+            return new Promise((resolve) => {
+                mediaRecorder.addEventListener("stop", async () => {
+                    const mimeType = mediaRecorder.mimeType || "audio/webm";
+                    const extension = mimeType.includes("ogg") ? "ogg" : "webm";
+                    const blob = new Blob(recordedChunks, { type: mimeType });
+                    const formData = new FormData();
+                    formData.append("audio", blob, `recording.${extension}`);
+                    formData.append("provider", selectedProvider);
+                    voiceStatus.textContent = "Transcribing...";
+                    voiceTranscript.textContent = "Processing your recording...";
+                    voiceReply.textContent = "Waiting for the answer...";
+                    try {
+                        const response = await fetch("/voice-chat", { method: "POST", body: formData });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.detail || "Voice request failed.");
+                        voiceTranscript.textContent = data.transcript;
+                        voiceReply.textContent = data.reply;
+                        appendMessage(data.transcript, "user");
+                        appendMessage(data.reply, "bot");
+                        playAudio(data.audio_base64, data.content_type);
+                        voiceStatus.textContent = "Tap the mic to speak";
+                    } catch (error) {
+                        console.error("Voice chat error:", error);
+                        voiceReply.textContent = error.message || "Voice request failed.";
+                        appendMessage(error.message || "Voice request failed.", "bot");
+                        voiceStatus.textContent = "Voice request failed";
+                    }
+                    resolve();
+                }, { once: true });
+                mediaRecorder.stop();
+            });
+        }
+
+        function startBrowserSpeech() {
+            if (!SpeechRecognition) {
+                voiceStatus.textContent = "Browser speech input unavailable";
+                return;
+            }
+            speechRecognition = new SpeechRecognition();
+            speechRecognition.lang = "en-IN";
+            speechRecognition.interimResults = true;
+            speechRecognition.continuous = false;
+            speechRecognition.onstart = () => {
+                micBtn.classList.add("recording");
+                micBtn.textContent = "⏹";
+                voiceStatus.textContent = "Listening...";
+            };
+            speechRecognition.onresult = (event) => {
+                let transcript = "";
+                for (let index = 0; index < event.results.length; index += 1) {
+                    transcript += event.results[index][0].transcript;
+                }
+                transcript = transcript.trim();
+                voiceTranscript.textContent = transcript || "Listening...";
+                if (event.results[event.results.length - 1].isFinal && transcript) {
+                    messageInput.value = transcript;
+                    sendMessage();
+                }
+            };
+            speechRecognition.onerror = (event) => {
+                micBtn.classList.remove("recording");
+                micBtn.textContent = "🎙️";
+                speechRecognition = null;
+                if (event.error === "network") {
+                    voiceStatus.textContent = "Browser speech unavailable; recording for server transcription...";
+                    startRecordedRecording();
+                } else {
+                    voiceStatus.textContent = event.error === "not-allowed"
+                        ? "Microphone permission denied"
+                        : `Speech input unavailable (${event.error}); try again`;
+                }
+            };
+            speechRecognition.onend = () => {
+                micBtn.classList.remove("recording");
+                micBtn.textContent = "🎙️";
+                speechRecognition = null;
+            };
+            try {
+                speechRecognition.start();
+            } catch (error) {
+                console.error("Speech recognition start error:", error);
+                speechRecognition = null;
+                voiceStatus.textContent = "Could not start microphone";
+            }
+        }
+
+        async function startRecordedRecording() {
+            if (!navigator.mediaDevices || !window.MediaRecorder) {
+                voiceStatus.textContent = "Microphone unsupported";
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(stream);
+                audioContext = new AudioContext();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                audioContext.createMediaStreamSource(stream).connect(analyser);
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size) recordedChunks.push(event.data);
+                };
+                mediaRecorder.start();
+                micBtn.classList.add("recording");
+                micBtn.textContent = "⏹";
+                voiceStatus.textContent = "Listening (server transcription)...";
+                drawWaveform();
+                mediaRecorder.addEventListener("stop", () => {
+                    stream.getTracks().forEach((track) => track.stop());
+                    if (audioContext) audioContext.close();
+                }, { once: true });
+            } catch (error) {
+                console.error("Microphone start error:", error);
+                voiceStatus.textContent = error.name === "NotAllowedError"
+                    ? "Microphone permission denied"
+                    : "Could not access microphone";
+            }
+        }
+
+        async function toggleRecording() {
+            if (speechRecognition) {
+                speechRecognition.stop();
+                return;
+            }
+            if (SpeechRecognition) {
+                voiceTranscript.textContent = "Listening...";
+                startBrowserSpeech();
+                return;
+            }
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                micBtn.classList.remove("recording");
+                micBtn.textContent = "🎙️";
+                stopWaveform();
+                await finishRecording();
+                return;
+            }
+            await startRecordedRecording();
+        }
+
+        // Send message
+        async function sendMessage() {
+            currentUserMessage = messageInput.value;
+            if (!currentUserMessage.trim()) return;
+            
+            currentUserMessage = currentUserMessage.trim();
+            
+            // Add user message
+            appendMessage(currentUserMessage, "user");
+            
+            // Clear input
+            messageInput.value = "";
+            
+            // Send to backend
+            isLoading = true;
+            sendBtn.disabled = true;
+            
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        message: currentUserMessage,
+                        provider: selectedProvider
+                    })
+                });
+                
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "The server could not process the request.");
+                }
+                
+                if (data.reply) {
+                    voiceReply.textContent = data.reply;
+                    appendMessage(data.reply, "bot");
+                    if (selectedProvider === "sarvam") {
+                        speakReply(data.reply).catch((error) => console.warn("Audio reply unavailable:", error));
+                    } else {
+                        speakWithBrowser(data.reply);
+                    }
+                } else {
+                    appendMessage("I'm sorry, I encountered an error. Please try again.", "bot");
+                }
+
+            } catch (error) {
+                console.error("Chat error:", error);
+                appendMessage(error.message || "An error occurred. Please try again later.", "bot");
+            } finally {
+                isLoading = false;
+                sendBtn.disabled = false;
+            }
+        }
+        
+        // Event listeners
+        sendBtn.addEventListener("click", sendMessage);
+        micBtn.addEventListener("click", toggleRecording);
+        messageInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+    </script>
+</body>
+</html>
