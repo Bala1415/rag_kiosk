@@ -1,0 +1,3 @@
+# Optional local speech-to-text support.
+# Requires ffmpeg on the host OS for browser-recorded WebM/Ogg files.
+faster-whisper>=1.1,<2

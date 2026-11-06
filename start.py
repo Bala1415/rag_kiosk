@@ -35,22 +35,26 @@ def print_banner():
 
 
 def validate_env():
-    """Load .env and check for required variables."""
+    """Load .env and report optional provider configuration."""
     try:
         from dotenv import load_dotenv
         load_dotenv()
     except ImportError:
         pass  # dotenv optional; vars may already be exported
 
+    provider = os.getenv("DEFAULT_PROVIDER", "ollama").lower()
     api_key = os.getenv("SARVAM_API_KEY")
-    if not api_key:
-        print("❌  ERROR: SARVAM_API_KEY not found.")
-        print("   Please add it to your .env file:")
-        print("       SARVAM_API_KEY=your_key_here")
-        print()
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+
+    if provider == "sarvam" and not api_key:
+        print("❌  ERROR: DEFAULT_PROVIDER=sarvam requires SARVAM_API_KEY.")
         return False
 
-    print("✅  Environment validated (Sarvam API key present)")
+    if api_key:
+        print("✅  Sarvam API key configured")
+    else:
+        print("ℹ️  Sarvam API key not configured; Ollama-only mode is available")
+    print(f"✅  LLM endpoint: {ollama_url}")
     return True
 
 
@@ -122,7 +126,7 @@ def ingest_data():
     print("\n📥  Running one-time data ingestion...")
 
     jobs = [
-        ("/ingest/harddisk", "Hard disk documents (F:\\Dept activities)"),
+        ("/ingest/harddisk", "Local documents (DATA_DIR)"),
         ("/ingest/website",  "College website (srmvalliammai.ac.in)"),
     ]
 

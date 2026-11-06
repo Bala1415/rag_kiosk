@@ -5,10 +5,9 @@ uvicorn[standard]==0.32.0
 # Vector Database & Embeddings
 chromadb==0.5.17
 sentence-transformers==3.1.1
-# CUDA-enabled PyTorch for NVIDIA GPU acceleration. Remove the extra index and
-# use a CPU build only when deploying on a machine without an NVIDIA GPU.
---extra-index-url https://download.pytorch.org/whl/cu128
-torch==2.11.0+cu128
+# Install PyTorch separately using the build supplied for the target platform.
+# See requirements-desktop.txt for Windows/Linux desktop CUDA installation and
+# requirements-jetson.txt for JetPack-compatible Jetson installation.
 
 # Document Parsing
 pypdf==4.2.0

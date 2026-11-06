@@ -628,11 +628,6 @@
                 speechRecognition.stop();
                 return;
             }
-            if (SpeechRecognition) {
-                voiceTranscript.textContent = "Listening...";
-                startBrowserSpeech();
-                return;
-            }
             if (mediaRecorder && mediaRecorder.state === "recording") {
                 micBtn.classList.remove("recording");
                 micBtn.textContent = "🎙️";
@@ -640,6 +635,7 @@
                 await finishRecording();
                 return;
             }
+            voiceTranscript.textContent = "Listening...";
             await startRecordedRecording();
         }
 

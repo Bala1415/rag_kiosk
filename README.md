@@ -23,18 +23,17 @@ This kiosk provides instant, accurate answers about your department using:
 
 ### Installation
 
-.\venv311\Scripts\Activate.ps1
-
 ```bash
 # 1. Clone / navigate to project
 cd rag_kiosk
 
 # 2. Create and activate a virtual environment
-py -3.11 -m venv venv311
-venv311\Scripts\activate
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/Jetson: source .venv/bin/activate
 
 # 3. Install Python dependencies
-pip install -r requirements.txt
+pip install -r requirements-desktop.txt
 
 # 4. Verify installation
 pip list
@@ -42,31 +41,59 @@ pip list
 
 ### Configuration
 
-Set up your Sarvam AI API key in `.env`:
+Copy `.env.example` to `.env` and edit machine-specific values:
 
 ```env
-SARVAM_API_KEY=your_key_here
-SARVAM_API_BASE=https://api.sarvam.ai/v1
-SARVAM_TTS_LANGUAGE=ta-IN
-SARVAM_TTS_SPEAKER=shubh_enhi_ads
-SARVAM_TTS_MODEL=bulbul:v4-flash
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_MODEL=llama3.1-performance:latest
-RETRIEVAL_TOP_K=8
-CONTEXT_CHARS_PER_RESULT=1200
+DEFAULT_PROVIDER=ollama
+OLLAMA_BASE_URL=http://<AGX_ORIN_IP>:11434
+OLLAMA_MODEL=gpt-oss:20b
+DATA_DIR=./newsletter
 COLLEGE_URL=https://www.srmvalliammai.ac.in/
 DEPARTMENT_URL=https://www.srmvalliammai.ac.in/department/department-of-artificial-intelligence-and-data-science
-# Maximum same-domain URLs visited per website ingestion
 WEBSITE_MAX_PAGES=150
-DATA_DIR=F:\\Dept activities
-# auto selects CUDA when available; use cpu or cuda to override
 EMBEDDING_DEVICE=auto
+STT_PROVIDER=whisper
+WHISPER_MODEL=small
+WHISPER_LANGUAGE=
+WHISPER_TASK=transcribe
+WHISPER_DEVICE=auto
+WHISPER_COMPUTE_TYPE=auto
+SARVAM_STT_LANGUAGE=en-IN
+TTS_PROVIDER=sarvam
+SARVAM_TTS_LANGUAGE=ta-IN
 ```
+
+Keep `.env` private; it is ignored by Git. Never commit API keys.
 
 Ollama uses available GPU acceleration by default. Do not set `num_gpu` to
 `0` in the request, because that explicitly forces CPU-only inference. For an
 NVIDIA GPU, install the current NVIDIA driver and run `ollama serve`; verify
 GPU usage with `ollama ps` or `nvidia-smi` while a request is running.
+
+On Windows, install `requirements-desktop.txt`. On Jetson, first install the
+PyTorch wheel matching the installed JetPack release, then run:
+
+```bash
+pip install -r requirements-jetson.txt
+```
+
+For server-side voice input, install the optional Whisper dependency and FFmpeg:
+
+```bash
+sudo apt-get install -y ffmpeg
+pip install -r requirements-voice.txt
+```
+
+The browser records audio and the backend transcribes it with
+`faster-whisper`. `WHISPER_MODEL=small` is a quality-oriented default; use
+`tiny` or `base` on an 8 GB Nano if memory or latency is a problem. The first
+voice request downloads the selected model. Sarvam TTS is used for reliable
+Indian-language audio output, so `SARVAM_API_KEY` is required for `/speak` and
+`/voice-chat`.
+
+Use `WHISPER_TASK=transcribe` to preserve the spoken language. Use
+`WHISPER_TASK=translate` only when you specifically want Whisper to translate
+speech into English. Set `SARVAM_STT_LANGUAGE` when Sarvam is used as fallback.
 
 The RAG embedding pipeline also uses CUDA automatically when PyTorch detects
 an NVIDIA GPU. On startup it prints the selected device and GPU name. If CUDA
@@ -94,7 +121,7 @@ python run.py
 # Initialize backend
 python run.py
 
-# Ingest hard disk documents (F:\Dept activities)
+# Ingest documents configured by DATA_DIR
 POST http://localhost:8000/ingest/harddisk
 
 # Scrape college website

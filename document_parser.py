@@ -10,6 +10,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+DEFAULT_DATA_DIR = PROJECT_ROOT / "newsletter"
+
 # Optional OCR - gracefully handle if tesseract not installed
 try:
     import pytesseract
@@ -276,7 +279,7 @@ def collect_files(directory: str) -> List[str]:
 def parse_all_documents(data_dir: str = None) -> List[Dict[str, Any]]:
     """Parse all documents from the data directory."""
     if data_dir is None:
-        data_dir = os.getenv("DATA_DIR", "F:\\Dept activities")
+        data_dir = os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR))
     
     if not os.path.exists(data_dir):
         print(f"WARNING: Data directory not found: {data_dir}")

@@ -4,6 +4,7 @@ Main FastAPI Backend - RAG Chatbot Server
 import asyncio
 import os
 import logging
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
 import requests
@@ -22,13 +23,25 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1-performance:latest")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
+STT_PROVIDER = os.getenv("STT_PROVIDER", "whisper").lower()
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
+WHISPER_LANGUAGE = os.getenv("WHISPER_LANGUAGE", "").strip() or None
+WHISPER_TASK = os.getenv("WHISPER_TASK", "transcribe").lower()
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "auto").lower()
+WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "auto").lower()
+TTS_PROVIDER = os.getenv("TTS_PROVIDER", "sarvam").lower()
+_configured_provider = os.getenv("DEFAULT_PROVIDER", "ollama").lower()
+DEFAULT_PROVIDER: Literal["ollama", "sarvam"] = (
+    _configured_provider if _configured_provider in {"ollama", "sarvam"} else "ollama"
+)
 SARVAM_API_ROOT = os.getenv("SARVAM_API_ROOT", "https://api.sarvam.ai")
 SARVAM_TTS_LANGUAGE = os.getenv("SARVAM_TTS_LANGUAGE", "ta-IN")
 SARVAM_TTS_SPEAKER = os.getenv("SARVAM_TTS_SPEAKER", "shubh_enhi_ads")
 SARVAM_TTS_MODEL = os.getenv("SARVAM_TTS_MODEL", "bulbul:v4-flash")
 RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "8"))
 CONTEXT_CHARS_PER_RESULT = int(os.getenv("CONTEXT_CHARS_PER_RESULT", "1200"))
+_whisper_model = None
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -56,7 +69,7 @@ app.mount(
 class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
-    provider: Literal["ollama", "sarvam"] = "ollama"
+    provider: Literal["ollama", "sarvam"] = DEFAULT_PROVIDER
 
 
 class SpeakRequest(BaseModel):
@@ -125,12 +138,97 @@ def sarvam_headers(api_key: str) -> Dict[str, str]:
     }
 
 
-def transcribe_audio(audio_bytes: bytes, filename: str, content_type: str, api_key: str) -> str:
+def transcribe_with_whisper(audio_bytes: bytes, filename: str) -> str:
+    """Transcribe audio locally with faster-whisper when configured."""
+    global _whisper_model
+
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError as exc:
+        raise RuntimeError(
+            "Local Whisper is not installed. Install requirements-voice.txt "
+            "or set STT_PROVIDER=sarvam."
+        ) from exc
+
+    device = "cuda" if WHISPER_DEVICE == "auto" and _cuda_available() else WHISPER_DEVICE
+    if device not in {"cpu", "cuda"}:
+        device = "cpu"
+    compute_type = WHISPER_COMPUTE_TYPE
+    if compute_type == "auto":
+        compute_type = "float16" if device == "cuda" else "int8"
+
+    if _whisper_model is None:
+        logger.info(
+            "Loading Whisper model=%s device=%s compute_type=%s",
+            WHISPER_MODEL,
+            device,
+            compute_type,
+        )
+        _whisper_model = WhisperModel(
+            WHISPER_MODEL,
+            device=device,
+            compute_type=compute_type,
+        )
+
+    suffix = Path(filename).suffix.lower() or ".webm"
+    audio_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as audio_file:
+            audio_file.write(audio_bytes)
+            audio_path = audio_file.name
+        segments, _ = _whisper_model.transcribe(
+            audio_path,
+            language=WHISPER_LANGUAGE,
+            task=WHISPER_TASK if WHISPER_TASK in {"transcribe", "translate"} else "transcribe",
+            vad_filter=True,
+            beam_size=5,
+        )
+        transcript = " ".join(segment.text.strip() for segment in segments).strip()
+    finally:
+        if audio_path:
+            Path(audio_path).unlink(missing_ok=True)
+
+    if not transcript:
+        raise ValueError("Whisper returned an empty transcript")
+    return transcript
+
+
+def _cuda_available() -> bool:
+    """Return whether the installed PyTorch build can use CUDA."""
+    try:
+        import torch
+
+        return bool(torch.cuda.is_available())
+    except ImportError:
+        return False
+
+
+def transcribe_audio(
+    audio_bytes: bytes,
+    filename: str,
+    content_type: str,
+    api_key: Optional[str],
+) -> str:
+    if STT_PROVIDER == "whisper":
+        try:
+            return transcribe_with_whisper(audio_bytes, filename)
+        except (ImportError, OSError, RuntimeError, ValueError) as exc:
+            if not api_key:
+                raise
+            logger.warning("Local Whisper failed; falling back to Sarvam STT: %s", exc)
+    elif STT_PROVIDER != "sarvam":
+        raise ValueError(f"Unsupported STT_PROVIDER: {STT_PROVIDER}")
+
+    if not api_key:
+        raise ValueError("SARVAM_API_KEY is required for Sarvam speech-to-text")
     response = requests.post(
         f"{SARVAM_API_ROOT}/speech-to-text",
         headers=sarvam_headers(api_key),
         files={"file": (filename, audio_bytes, content_type or "audio/webm")},
-        data={"model": "saaras:v4", "language_code": "en-IN"},
+        data={
+            "model": "saaras:v4",
+            "language_code": os.getenv("SARVAM_STT_LANGUAGE", "en-IN"),
+        },
         timeout=120,
     )
     if not response.ok:
@@ -147,6 +245,8 @@ def transcribe_audio(audio_bytes: bytes, filename: str, content_type: str, api_k
 
 
 def synthesize_speech(text: str, api_key: str) -> str:
+    if TTS_PROVIDER != "sarvam":
+        raise ValueError(f"Unsupported TTS_PROVIDER: {TTS_PROVIDER}")
     response = requests.post(
         f"{SARVAM_API_ROOT}/text-to-speech",
         headers={**sarvam_headers(api_key), "Content-Type": "application/json"},
@@ -441,8 +541,8 @@ async def chat(request: ChatRequest):
 async def speak(request: SpeakRequest):
     """Convert a text reply to base64-encoded WAV audio."""
     api_key = os.getenv("SARVAM_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=503, detail="Sarvam API key is not configured")
+    if TTS_PROVIDER == "sarvam" and not api_key:
+        raise HTTPException(status_code=503, detail="SARVAM_API_KEY is required for Sarvam TTS")
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
     try:
@@ -464,8 +564,6 @@ async def voice_chat(
 ):
     """Transcribe microphone audio, answer it, and synthesize the reply."""
     api_key = os.getenv("SARVAM_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=503, detail="Sarvam API key is required for voice input/output")
     audio_bytes = await audio.read()
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Audio file is empty")
@@ -491,6 +589,8 @@ Context:
             api_key,
             provider,
         )
+        if not api_key:
+            raise ValueError("SARVAM_API_KEY is required for text-to-speech output")
         audio_base64 = synthesize_speech(reply, api_key)
         return {
             "transcript": transcript,
@@ -503,6 +603,9 @@ Context:
         logger.error("Voice request failed: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc))
     except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except RuntimeError as exc:
+        logger.error("Voice transcription failed: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc))
 
 

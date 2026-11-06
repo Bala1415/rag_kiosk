@@ -15,7 +15,8 @@ from document_parser import DocumentParser
 
 load_dotenv()
 
-DATA_DIR = os.getenv("DATA_DIR", "F:\\Dept activities")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = os.getenv("DATA_DIR", str(PROJECT_ROOT / "newsletter"))
 SUPPORTED_EXTENSIONS = {
     '.pdf', '.docx', '.txt', '.md', '.png', '.jpg', '.jpeg',
     '.xlsx', '.xlsm', '.pptx',

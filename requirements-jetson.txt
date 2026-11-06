@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Install the JetPack-compatible PyTorch wheel before this file.
+# NVIDIA Jetson wheels are version-specific and should not be pinned here.
